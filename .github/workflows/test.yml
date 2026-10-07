@@ -2,6 +2,10 @@ name: Test Docker Images
 
 on:
   pull_request:
+  workflow_dispatch:
+  push:
+    branches:
+      - fedora/main
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -9,13 +13,15 @@ concurrency:
 
 jobs:
   matrix-builder:
+    # Ubuntu/Debian images are built by Upstream only; the Port Org builds ci-fedora.
+    if: github.repository_owner == 'regolith-linux'
     runs-on: ubuntu-24.04
     outputs:
       includes: ${{ steps.builder.outputs.includes }}
     steps:
       - name: Build Matrix
         id: builder
-        uses: regolith-linux/actions/build-matrix@main
+        uses: regolith-linux-fedora/actions/build-matrix@fedora/main
         with:
           type: "platform"
           stage: "unstable"
@@ -57,3 +63,81 @@ jobs:
             "PACKAGES=${{ env.packages }}"
           file: ${{ matrix.distro }}/Dockerfile
           tags: ci-${{ matrix.distro }}:${{ matrix.codename }}-${{ matrix.arch }}
+
+  fedora-matrix:
+    runs-on: ubuntu-24.04
+    outputs:
+      includes: ${{ steps.builder.outputs.includes }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Until voulage has Fedora stage trees (Task 01-04), the fedora/<release>/
+      # folders are the list of Targets.
+      - name: Build Fedora Matrix
+        id: builder
+        env:
+          ARCHES: "amd64 arm64"
+        run: |
+          includes=$(for dir in fedora/*/additional-packages; do
+            codename=$(basename "$(dirname "$dir")")
+            for arch in $ARCHES; do
+              jq -n -c --arg distro fedora --arg codename "$codename" --arg arch "$arch" '$ARGS.named'
+            done
+          done | jq -s -c .)
+          echo "$includes" | jq .
+          echo "includes=$includes" >> "$GITHUB_OUTPUT"
+
+  test-fedora:
+    needs: fedora-matrix
+    # Native runners per arch, as Upstream's build-matrix "runners" output maps them.
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    # Rawhide is a Canary Target: its failures must not fail the workflow.
+    continue-on-error: ${{ matrix.codename == 'rawhide' }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.fedora-matrix.outputs.includes) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Generate Packages List
+        run: |
+          packages="$(cat fedora/common-packages | grep -v "#" | tr '\n' ' ')"
+          packages+=" $(cat "fedora/${{ matrix.codename }}/additional-packages" | grep -v "#" | tr '\n' ' ')"
+          echo "packages=$packages" >> $GITHUB_ENV
+
+      - name: Build ci-fedora:${{ matrix.codename }}-${{ matrix.arch }} Image
+        uses: docker/build-push-action@v6.10.0
+        with:
+          context: .
+          platforms: "linux/${{ matrix.arch }}"
+          push: false
+          load: true
+          build-args: |
+            "REFERENCE=fedora:${{ matrix.codename }}"
+            "PACKAGES=${{ env.packages }}"
+          file: fedora/Dockerfile
+          tags: ci-fedora:${{ matrix.codename }}-${{ matrix.arch }}
+
+      - name: Smoke Test
+        run: |
+          docker run --rm -v "$PWD/fedora/test:/test:ro" \
+            ci-fedora:${{ matrix.codename }}-${{ matrix.arch }} /test/smoke.sh
+
+      # Bonus: build the test package in mock and record which isolation works
+      # inside the container (Task 01-05 depends on it). Never fails the job.
+      - name: Mock Probe
+        continue-on-error: true
+        run: |
+          docker run --rm --privileged -v "$PWD/fedora/test:/test:ro" \
+            -e MOCK=1 -e MOCK_CONFIG="fedora-${{ matrix.codename }}-${{ matrix.arch == 'arm64' && 'aarch64' || 'x86_64' }}" \
+            ci-fedora:${{ matrix.codename }}-${{ matrix.arch }} /test/smoke.sh | tee mock-probe.log
+          grep -E '^MOCK_ISOLATION_(OK|FAILED)=' mock-probe.log >> "$GITHUB_STEP_SUMMARY" || true
