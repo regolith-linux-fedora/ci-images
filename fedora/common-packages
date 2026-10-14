@@ -1,0 +1,41 @@
+# Fedora counterpart of the top-level common-packages (which is Debian-only).
+# Installed into every ci-fedora image, plus fedora/<release>/additional-packages.
+
+# essentials
+curl
+jq
+rsync
+openssh-clients
+sudo
+wget
+diffutils
+findutils
+
+# git related packages
+ca-certificates
+git
+
+# gpg packages
+gnupg2
+
+# packages required for building .rpm packages
+rpm-build
+rpmdevtools
+rpmlint
+mock
+dnf-plugins-core
+copr-cli
+systemd-rpm-macros
+desktop-file-utils
+appstream
+
+# toolchains used by Regolith packages
+gcc
+make
+meson
+ninja-build
+vala
+python3
+cargo
+rust
+cargo-rpm-macros

@@ -57,6 +57,27 @@ The supported releases of Ubuntu for different CPU architecture.
 | `ci-ubuntu` | `questing-amd64`   | `questing-arm64`   | -           |
 | `ci-ubuntu` | `resolute-amd64`   | `resolute-arm64`   | -           |
 
+### Fedora
+
+Built by the Regolith Fedora port (`regolith-linux-fedora`) from `fedora/Dockerfile`,
+`fedora/common-packages` and `fedora/<release>/additional-packages`. `rawhide` is a
+canary: its jobs may fail without failing the workflow.
+
+| Image Name  | Tag Name (`amd64`) | Tag Name (`arm64`) | End of Life |
+|:------------|:-------------------|--------------------|:-----------:|
+| `ci-fedora` | `43-amd64`         | `43-arm64`         | -           |
+| `ci-fedora` | `44-amd64`         | `44-arm64`         | -           |
+| `ci-fedora` | `rawhide-amd64`    | `rawhide-arm64`    | -           |
+
+Smoke-test an image locally (add `--privileged -e MOCK=1` to also try a mock build):
+
+```bash
+$ docker run --rm -v "$PWD/fedora/test:/test:ro" ghcr.io/regolith-linux-fedora/ci-fedora:43-amd64 /test/smoke.sh
+```
+
+To add or drop a Fedora release, add or remove its `fedora/<release>/additional-packages`
+folder (until voulage carries Fedora stage trees) and update the table above.
+
 ## Example
 
 ```bash

@@ -12,13 +12,16 @@ on:
 
 jobs:
   matrix-builder:
+    # Upstream-only: derives ubuntu/ and debian/ folders from voulage. The fedora/
+    # folders are maintained by hand until voulage has Fedora stage trees (Task 01-04).
+    if: github.repository_owner == 'regolith-linux'
     runs-on: ubuntu-24.04
     outputs:
       includes: ${{ steps.builder.outputs.includes }}
     steps:
       - name: Build Matrix
         id: builder
-        uses: regolith-linux/actions/build-matrix@main
+        uses: regolith-linux-fedora/actions/build-matrix@fedora/main
         with:
           type: "platform"
           stage: "unstable"
