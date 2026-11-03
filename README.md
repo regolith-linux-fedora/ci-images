@@ -67,6 +67,7 @@ canary: its jobs may fail without failing the workflow.
 |:------------|:-------------------|--------------------|:-----------:|
 | `ci-fedora` | `43-amd64`         | `43-arm64`         | -           |
 | `ci-fedora` | `44-amd64`         | `44-arm64`         | -           |
+| `ci-fedora` | `45-amd64`         | `45-arm64`         | -           |
 | `ci-fedora` | `rawhide-amd64`    | `rawhide-arm64`    | -           |
 
 Smoke-test an image locally (add `--privileged -e MOCK=1` to also try a mock build):
